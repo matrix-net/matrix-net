@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MATRIX_NET // NEXT-GEN CORE</title>
+    <style>
+        /* Современная Sci-Fi палитра с поддержкой Glassmorphism */
+        .theme-cyber {
+            --primary: #00f2fe; --secondary: #9d4edd; --bg: #0a0616;
+            --panel: rgba(20, 15, 38, 0.7); --border: rgba(0, 242, 254, 0.2);
+            --text-muted: #8a81a7; --text-main: #f1edff; --input: rgba(10, 7, 22, 0.6);
+            --chat-bubble: rgba(0, 242, 254, 0.06); --chat-self: rgba(157, 78, 221, 0.12);
+        }
+        .theme-matrix {
+            --primary: #39ff14; --secondary: #008f11; --bg: #050b05;
+            --panel: rgba(10, 20, 10, 0.75); --border: rgba(57, 255, 20, 0.2);
+            --text-muted: #4e804e; --text-main: #d2ffd2; --input: rgba(2, 8, 2, 0.7);
+            --chat-bubble: rgba(57, 255, 20, 0.05); --chat-self: rgba(0, 143, 17, 0.15);
+        }
+        .theme-sand {
+            --primary: #ffaa00; --secondary: #e85d04; --bg: #0f0b07;
+            --panel: rgba(30, 20, 12, 0.75); --border: rgba(255, 170, 0, 0.2);
+            --text-muted: #9c8269; --text-main: #fff0e0; --input: rgba(15, 10, 6, 0.7);
+            --chat-bubble: rgba(255, 170, 0, 0.05); --chat-self: rgba(232, 93, 4, 0.12);
+        }
+        .theme-gotham {
+            --primary: #f8fafc; --secondary: #475569; --bg: #0f172a;
+            --panel: rgba(30, 41, 59, 0.7); --border: rgba(248, 250, 252, 0.15);
+            --text-muted: #94a3b8; --text-main: #f8fafc; --input: rgba(15, 23, 42, 0.6);
+            --chat-bubble: rgba(248, 250, 252, 0.05); --chat-self: rgba(71, 85, 105, 0.2);
+        }
+        .theme-alarm {
+            --primary: #ff4d4d; --secondary: #9b2226; --bg: #110202;
+            --panel: rgba(35, 10, 10, 0.75); --border: rgba(255, 77, 77, 0.2);
+            --text-muted: #aa7777; --text-main: #ffebeb; --input: rgba(20, 4, 4, 0.7);
+            --chat-bubble: rgba(255, 77, 77, 0.06); --chat-self: rgba(155, 34, 38, 0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; overflow-x: hidden; padding: 25px 15px; position: relative; transition: background-color 0.5s ease; }
+        
+        #matrix-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; opacity: 0.1; pointer-events: none; }
+
+        /* ЭКРАН ПОЛНОЙ БЛОКИРОВКИ НА СТАРТЕ */
+        .global-lock-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(5, 3, 10, 0.85); 
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); z-index: 9999; 
+            display: flex; justify-content: center; align-items: center; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .global-lock-screen.unlocked { opacity: 0; pointer-events: none; transform: scale(1.05); }
+
+        .auth-ui-box { 
+            background: rgba(15, 10, 30, 0.5); border: 1px solid var(--border); padding: 40px; border-radius: 24px; 
+            width: 100%; max-width: 390px; text-align: center; box-shadow: 0 25px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+            animation: lockBoxIntro 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes lockBoxIntro { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        
+        .auth-ui-box h2 { margin-bottom: 25px; font-size: 16px; font-weight: 700; letter-spacing: 2px; color: #fff; text-transform: uppercase; }
+        .auth-ui-input { width: 100%; padding: 14px; background: var(--input); border: 1px solid var(--border); color: #fff; border-radius: 12px; margin-bottom: 15px; outline: none; font-size: 14px; text-align: center; transition: all 0.3s ease; }
+        .auth-ui-input:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(0, 242, 254, 0.15); }
+        .btn-auth-submit { width: 100%; padding: 14px; background: #fff; color: #000; border: none; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 13px; transition: all 0.3s ease; }
+        .btn-auth-submit:hover { box-shadow: 0 8px 25px rgba(255,255,255,0.25); transform: translateY(-2px); }
+        
+        .shake { animation: shakeAnim 0.35s ease-in-out; border-color: #ff4d4d !important; box-shadow: 0 0 15px rgba(255,77,77,0.2) !important; }
+        @keyframes shakeAnim { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+
+        /* ГЛАВНЫЙ КОНТЕЙНЕР ПРИЛОЖЕНИЯ */
+        .app-container {
+            width: 100%; max-width: 1150px; background: var(--panel); border: 1px solid var(--border); border-radius: 24px; padding: 25px;
+            box-shadow: 0 30px 70px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); 
+            z-index: 2; position: relative; opacity: 0; transform: scale(0.97) translateY(20px); transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .app-container.visible { opacity: 1; transform: scale(1) translateY(0); }
+
+        /* Шапка */
+        .app-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 25px; }
+        .app-title-group { display: flex; align-items: center; gap: 10px; }
+        .app-status-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 10px var(--primary); animation: pulse 1.5s infinite alternate; }
+        .app-title { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; color: #fff; }
+        .app-version { font-size: 11px; background: rgba(255,255,255,0.07); padding: 3px 8px; border-radius: 20px; color: var(--text-muted); font-family: monospace; }
+
+        @keyframes pulse { 0% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        /* Выбор тем */
+        .theme-selector { display: flex; gap: 10px; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.03); }
+        .theme-node { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .theme-node:hover { transform: scale(1.25); }
+        .theme-node.active { border-color: #fff; transform: scale(1.1); box-shadow: 0 0 12px rgba(255,255,255,0.3); }
+
+        /* Современные Табы */
+        .tabs-navigation { display: flex; gap: 6px; margin-bottom: 25px; background: rgba(0,0,0,0.25); padding: 6px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.03); }
+        .tab-trigger { flex: 1; padding: 14px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-weight: 600; font-size: 14px; border-radius: 12px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .tab-trigger:hover { color: #fff; background: rgba(255,255,255,0.03); }
+        .tab-trigger.active { color: #000; background: #fff; box-shadow: 0 10px 25px rgba(255,255,255,0.15); font-weight: 700; }
+
+        /* Модульная сетка */
+        .app-workspace { display: grid; grid-template-columns: 280px 1fr; gap: 25px; }
+        .sidebar-panel { display: flex; flex-direction: column; gap: 20px; }
+        
+        /* Гладкие карточки */
+        .ui-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 18px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); transition: all 0.3s ease; }
+        .ui-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+        .card-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; font-weight: 700; letter-spacing: 1px; }
+        
+        /* Поля ввода и Кнопки */
+        .input-group { display: flex; align-items: center; background: var(--input); border: 1px solid var(--border); border-radius: 12px; padding: 6px 12px; gap: 10px; transition: all 0.3s ease; }
+        .input-group:focus-within { border-color: var(--primary); box-shadow: 0 0 15px rgba(0, 242, 254, 0.12); }
+        .input-field-num { flex: 1; background: none; border: none; color: #fff; font-size: 18px; font-weight: 700; outline: none; text-align: center; font-family: monospace; }
+        .input-field-num::-webkit-inner-spin-button { -webkit-appearance: none; }
+        
+        .modern-btn { background: var(--primary); color: #000; border: none; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 13px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); display: inline-flex; align-items: center; justify-content: center; }
+        .modern-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--primary); }
+        .modern-btn:active { transform: translateY(0); }
+
+        .badge-status { font-size: 11px; padding: 12px; border-radius: 12px; text-align: center; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; border: 1px solid #ff4d4d; color: #ff4d4d; background: rgba(255, 77, 77, 0.05); transition: all 0.4s ease; }
+
+        /* Контентная зона */
+        .view-pane { animation: paneIntro 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes paneIntro { from { opacity: 0; transform: scale(0.98) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        /* КРИПТОБУФЕР UI */
+        .segmented-control { display: flex; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 20px; padding: 4px; }
+        .segment-btn { flex: 1; padding: 12px; border: none; background: none; color: var(--text-muted); cursor: pointer; font-weight: 600; font-size: 13px; border-radius: 10px; transition: all 0.25s ease; }
+        .segment-btn.active { background: rgba(255,255,255,0.08); color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        
+        .modern-textarea { width: 100%; height: 180px; background: var(--input); border: 1px solid var(--border); border-radius: 16px; padding: 18px; color: #fff; font-size: 14px; outline: none; margin-bottom: 20px; resize: none; line-height: 1.5; transition: all 0.3s ease; }
+        .modern-textarea:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(0, 242, 254, 0.05); }
+        
+        .row-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .btn-secondary-ui { padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: #fff; font-size: 13px; font-weight: 600; border-radius: 12px; cursor: pointer; transition: all 0.25s ease; }
+        .btn-secondary-ui:hover { background: rgba(255,255,255,0.08); border-color: var(--primary); transform: translateY(-1px); }
+        #file-chooser { display: none; }
+        
+        .btn-primary-action { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: #fff; border: none; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; border-radius: 14px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .btn-primary-action:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0, 242, 254, 0.3); }
+
+        .output-wrapper { padding: 18px; background: rgba(0,0,0,0.3); border: 1px dashed var(--border); border-radius: 14px; position: relative; margin-top: 20px; animation: outputReveal 0.35s ease-out; }
+        @keyframes outputReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .btn-copy-floating { position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 700; color: var(--primary); border: 1px solid var(--border); padding: 5px 12px; border-radius: 8px; cursor: pointer; background: var(--bg); transition: all 0.2s ease; }
+        .btn-copy-floating:hover { background: #fff; color: #000; }
+        .output-display-text { word-break: break-all; white-space: pre-wrap; font-size: 14px; font-family: monospace; padding-right: 60px; color: #fff; }
+
+        /* МЕССЕНДЖЕР */
+        .messenger-layout { border: 1px solid var(--border); border-radius: 18px; background: rgba(0, 0, 0, 0.3); display: grid; grid-template-rows: 60px 1fr 70px; height: 480px; overflow: hidden; width: 100%; }
+        
+        .messenger-header-bar { background: rgba(0, 0, 0, 0.2); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .channel-info { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; color: #fff; }
+        .channel-dot { width: 6px; height: 6px; background: #39ff14; border-radius: 50%; }
+        .session-exit { cursor: pointer; font-size: 12px; color: var(--text-muted); font-weight: 600; transition: color 0.2s; }
+        .session-exit:hover { color: #ff4d4d; }
+        
+        .messenger-main-core { display: grid; grid-template-columns: 1fr 220px; height: 100%; overflow: hidden; }
+        .chat-scroll-area { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; background: rgba(0,0,0,0.1); scroll-behavior: smooth; }
+        
+        /* Внутренняя панель управления чатом */
+        .chat-internal-sidebar { background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+        .internal-input-nick { width: 100%; background: var(--input); border: 1px solid var(--border); border-radius: 10px; padding: 10px; color: #fff; outline: none; font-size: 13px; font-weight: 600; transition: border 0.2s; }
+        .internal-input-nick:focus { border-color: var(--primary); }
+        
+        .btn-internal-action { width: 100%; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: #fff; font-size: 11px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; }
+        .btn-internal-action:hover { border-color: var(--primary); background: rgba(0, 242, 254, 0.04); transform: translateY(-1px); }
+        .btn-internal-danger { width: 100%; padding: 10px; background: rgba(255,77,77,0.05); border: 1px solid #ff4d4d; color: #ff4d4d; font-size: 11px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; }
+        .btn-internal-danger:hover { background: #ff4d4d; color: #000; transform: translateY(-1px); box-shadow: 0 4px 15px rgba(255,77,77,0.2); }
+
+        /* Пузыри сообщений */
+        .msg-bubble { background: var(--chat-bubble); border: 1px solid rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 14px 16px 16px 4px; max-width: 80%; align-self: flex-start; animation: slideIn 0.35s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .msg-meta-info { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 11px; }
+        .msg-author-name { color: var(--primary); font-weight: 700; }
+        .msg-timestamp { color: var(--text-muted); font-size: 10px; }
+        .msg-text-payload { color: var(--text-main); font-size: 13.5px; line-height: 1.45; word-break: break-all; }
+        .msg-bubble.self-sent { align-self: flex-end; border-color: rgba(255,255,255,0.05); border-radius: 16px 14px 4px 16px; background: var(--chat-self); }
+
+        /* Подвал чата */
+        .messenger-footer-bar { padding: 12px 20px; background: rgba(0, 0, 0, 0.2); border-top: 1px solid var(--border); display: flex; gap: 12px; align-items: center; }
+        .chat-input-field { flex: 1; background: var(--input); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; color: #fff; outline: none; font-size: 13.5px; transition: border 0.3s; }
+        .chat-input-field:focus { border-color: var(--primary); }
+        .btn-send-payload { background: #fff; color: #000; border: none; padding: 0 24px; height: 100%; max-height: 46px; border-radius: 12px; cursor: pointer; font-size: 13px; font-weight: 700; transition: all 0.25s ease; display: flex; align-items: center; }
+        .btn-send-payload:hover { transform: translateY(-1px); box-shadow: 0 5px 15px rgba(255,255,255,0.15); }
+
+        /* Живой консольный журнал */
+        .app-logs-panel { margin-top: 25px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.02); border-radius: 14px; padding: 12px 18px; height: 55px; overflow-y: hidden; font-size: 11px; color: var(--text-muted); font-family: monospace; line-height: 1.5; }
+
+        @media (max-width: 900px) {
+            .app-workspace { grid-template-columns: 1fr; gap: 20px; }
+            .sidebar-panel { flex-direction: row; flex-wrap: wrap; }
+            .sidebar-panel .ui-card { flex: 1; min-width: 200px; }
+            .messenger-main-core { grid-template-columns: 1fr; }
+            .chat-internal-sidebar { border-left: none; border-bottom: 1px solid var(--border); grid-row: 1; flex-direction: row; flex-wrap: wrap; padding: 12px; }
+            .chat-internal-sidebar .ui-internal-card { flex: 1; min-width: 130px; }
+            .messenger-layout { height: 580px; grid-template-rows: 60px 1fr 70px; }
+        }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+</head>
+<body class="theme-cyber">
+
+<canvas id="matrix-canvas"></canvas>
+
+<div id="global-lock" class="global-lock-screen">
+    <div class="auth-ui-box" id="auth-box">
+        <h2>ВХОД В MATRIX_NET</h2>
+        <input type="text" id="auth-login" class="auth-ui-input" placeholder="МАСТЕР-ЛОГИН" autocomplete="off">
+        <input type="password" id="auth-password" class="auth-ui-input" placeholder="МАСТЕР-ПАРОЛЬ" autocomplete="off">
+        <button class="btn-auth-submit" onclick="tryNetworkLogin()">Авторизовать терминал</button>
+    </div>
+</div>
+
+<div id="app-wrapper" class="app-container">
+    <div class="app-header">
+        <div class="app-title-group">
+            <div class="app-status-dot"></div>
+            <div class="app-title">MATRIX_NET</div>
+            <div class="app-version">v5.5 Stable</div>
+        </div>
+        <div class="theme-selector">
+            <div class="theme-node active" style="background: #00f2fe;" onclick="setTheme(this, 'cyber')"></div>
+            <div class="theme-node" style="background: #39ff14;" onclick="setTheme(this, 'matrix')"></div>
+            <div class="theme-node" style="background: #ffaa00;" onclick="setTheme(this, 'sand')"></div>
+            <div class="theme-node" style="background: #e2e8f0;" onclick="setTheme(this, 'gotham')"></div>
+            <div class="theme-node" style="background: #ff4d4d;" onclick="setTheme(this, 'alarm')"></div>
+        </div>
+    </div>
+
+    <div class="tabs-navigation">
+        <button class="tab-trigger active" id="tab-btn-buffer" onclick="switchHubTab('buffer')">📂 Крипто-Буфер</button>
+        <button class="tab-trigger" id="tab-btn-chat" onclick="switchHubTab('chat')">📡 Сетевой Эфир</button>
+    </div>
+
+    <div class="app-workspace">
+        <div class="sidebar-panel">
+            <div class="ui-card">
+                <div class="card-title">Ключ шифра (Соль)</div>
+                <div class="input-group">
+                    <input type="number" id="cipher-salt" class="input-field-num" value="15" min="1" max="999" oninput="updateSecurityStatus()">
+                    <button class="modern-btn" onclick="generateRandomSalt()">⚡ GEN</button>
+                </div>
+            </div>
+            <div id="sec-badge" class="badge-status">Status: LOW</div>
+        </div>
+
+        <div class="main-content">
+            <div id="hub-content-buffer" class="view-pane">
+                <div class="segmented-control">
+                    <button class="segment-btn active" id="btn-enc" onclick="setMode('enc')">Зашифровать</button>
+                    <button class="segment-btn" id="btn-dec" onclick="setMode('dec')">Расшифровать</button>
+                </div>
+
+                <textarea id="main-input" class="modern-textarea" placeholder="Введите исходный текст для упаковки в контейнер .lmndiii или вставьте крипто-код для дешифровки..."></textarea>
+                
+                <div class="row-grid">
+                    <button class="btn-secondary-ui" onclick="exportEncryptedFile()">💾 Экспорт пакета</button>
+                    <button class="btn-secondary-ui" onclick="triggerImport()">📂 Импорт пакета</button>
+                    <input type="file" id="file-chooser" accept=".lmndiii" onchange="importAndDecryptFile(this)">
+                </div>
+
+                <button class="btn-primary-action" onclick="executeCrypto()">Выполнить генерацию</button>
+
+                <div class="output-wrapper" id="out-block" style="display: none;">
+                    <div class="btn-copy-floating" onclick="copyOutput()">COPY</div>
+                    <div id="out-text" class="output-display-text"></div>
+                </div>
+            </div>
+
+            <div id="hub-content-chat" class="view-pane" style="display: none; width: 100%;">
+                <div class="messenger-layout">
+                    <div class="messenger-header-bar">
+                        <div class="channel-info">
+                            <div class="channel-dot"></div>
+                            <span>ЧАНЕЛ: FREQ_LINE_SECURED</span>
+                        </div>
+                        <span class="session-exit" onclick="networkLogout()">Выйти из системы</span>
+                    </div>
+                    
+                    <div class="messenger-main-core">
+                        <div class="chat-scroll-area" id="chat-window"></div>
+                        
+                        <div class="chat-internal-sidebar">
+                            <div class="ui-internal-card" style="width:100%;">
+                                <div class="card-title" style="margin-bottom: 6px;">Позывной</div>
+                                <input type="text" id="user-nickname" class="internal-input-nick" value="Lemonadiii" placeholder="Твой ник..." oninput="refreshChatDisplay()">
+                            </div>
+                            <div class="ui-internal-card" style="width:100%; margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+                                <div class="card-title" style="margin-bottom: 2px;">Управление</div>
+                                <button class="btn-internal-action" onclick="clearLocalHistory()">❌ Экран</button>
+                                <button class="btn-internal-danger" onclick="clearServerHistory()">🔥 WIPE БД</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="messenger-footer-bar">
+                        <input type="text" id="chat-msg-input" class="chat-input-field" placeholder="Зашифровать и отправить пакет в эфир..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                        <button class="btn-send-payload" onclick="sendChatMessage()">ОТПРАВИТЬ</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-logs-panel" id="log-box">
+        <div>[SYSTEM] Запуск защищенной графической оболочки выполнен успешно.</div>
+        <div>[READY] Системы ядра v5.5 онлайн. Ожидание авторизации...</div>
+    </div>
+</div>
+
+<script>
+    const MASTER_USER = "zarDOUD60";
+    const MASTER_PASS = "FrasH6b3";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBdoFrImD8yKmme7vH3wS4vVyZgmtTKf5M",
+        databaseURL: "https://matrix-stealth-chat-default-rtdb.asia-southeast1.firebasedatabase.app/",
+        projectId: "matrix-stealth-chat"
+    };
+
+    let database;
+    try {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        addLog("[NET] Канал связи с облаком Firebase верифицирован.");
+        listenNetworkChat();
+    } catch (e) {
+        addLog("[ERROR] Сбой инициализации сетевого стека.");
+    }
+
+    // ТАБЫ
+    function switchHubTab(tabName) {
+        document.getElementById('tab-btn-buffer').classList.toggle('active', tabName === 'buffer');
+        document.getElementById('tab-btn-chat').classList.toggle('active', tabName === 'chat');
+        
+        const bufCont = document.getElementById('hub-content-buffer');
+        const chatCont = document.getElementById('hub-content-chat');
+
+        if (tabName === 'buffer') {
+            chatCont.style.display = 'none';
+            bufCont.style.display = 'block';
+        } else {
+            bufCont.style.display = 'none';
+            chatCont.style.display = 'block';
+            refreshChatDisplay();
+        }
+    }
+
+    // ГЛОБАЛЬНАЯ АВТОРИЗАЦИЯ НА СТАРТЕ
+    function tryNetworkLogin() {
+        const u = document.getElementById('auth-login').value.trim();
+        const p = document.getElementById('auth-password').value.trim();
+        const box = document.getElementById('auth-box');
+
+        if (u === MASTER_USER && p === MASTER_PASS) {
+            document.getElementById('global-lock').classList.add('unlocked');
+            document.getElementById('app-wrapper').classList.add('visible');
+            addLog("[AUTH] Мастер-ключ верифицирован. Интерфейс разблокирован.");
+        } else {
+            box.classList.add('shake');
+            addLog("[SECURITY] Попытка несанкционированного доступа пресечена.");
+            setTimeout(() => { box.classList.remove('shake'); }, 350);
+        }
+    }
+
+    function networkLogout() {
+        document.getElementById('auth-login').value = "";
+        document.getElementById('auth-password').value = "";
+        document.getElementById('global-lock').classList.remove('unlocked');
+        document.getElementById('app-wrapper').classList.remove('visible');
+        addLog("[AUTH] Сессия закрыта пользователем. Терминал заблокирован.");
+    }
+
+    function refreshChatDisplay() {
+        if(database) { listenNetworkChat(); }
+    }
+
+    // СЛУЧАЙНАЯ СОЛЬ
+    function generateRandomSalt() {
+        const randomSalt = Math.floor(Math.random() * 990) + 10;
+        document.getElementById('cipher-salt').value = randomSalt;
+        updateSecurityStatus();
+        addLog(`[CRYPT] Сгенерирована случайная соль шифра: ${randomSalt}`);
+    }
+
+    // УПРАВЛЕНИЕ ИСТОРИЕЙ ЧАТА
+    function clearLocalHistory() {
+        const chatWindow = document.getElementById('chat-window');
+        chatWindow.innerHTML = `<div style="color: var(--text-muted); text-align:center; padding-top:20px;">[LOCAL] Локальная копия экрана стерта.</div>`;
+        addLog("[SYSTEM] Экранный буфер чата принудительно очищен.");
+    }
+
+    function clearServerHistory() {
+        if (!database) { addLog("[ERROR] Нет подключения к облаку."); return; }
+        
+        const confirmPass = prompt("ВНИМАНИЕ! Для уничтожения всей истории СЕРВЕРА введите Пароль:");
+        if (confirmPass === MASTER_PASS) {
+            database.ref('messages').set(null)
+                .then(() => {
+                    addLog("[WIPE] Облачная база данных полностью обнулена.");
+                    alert("История сообщений на сервере полностью уничтожена!");
+                })
+                .catch((err) => { addLog("[ERROR] Сбой очистки: " + err); });
+        } else if (confirmPass !== null) {
+            addLog("[SECURITY] Неверный токен. Команда WIPE отменена.");
+            alert("ОТКАЗАНО В ДОСТУПЕ: Неверный пароль!");
+        }
+    }
+
+    // РАБОТА С СЕТЕВЫМ ЧАТОМ
+    function listenNetworkChat() {
+        if (!database) return;
+        
+        database.ref('messages').limitToLast(35).on('value', (snapshot) => {
+            const chatWindow = document.getElementById('chat-window');
+            if (chatWindow.innerHTML.includes("[LOCAL]") && snapshot.val() === null) return;
+            
+            chatWindow.innerHTML = ""; 
+            const data = snapshot.val();
+            if (!data) {
+                chatWindow.innerHTML = `<div style="color: var(--text-muted); text-align:center; padding-top:20px;">[ETHER] Радиолиния свободна. Сообщений нет.</div>`;
+                return;
+            }
+            
+            let currentSalt = parseInt(document.getElementById('cipher-salt').value) || 15;
+            let myCurrentNick = document.getElementById('user-nickname').value.trim() || "Lemonadiii";
+            
+            Object.values(data).forEach(msgObj => {
+                let decryptedFullString = coreTransform(msgObj.text, currentSalt, 'dec');
+                let renderNick = "UNKNOWN";
+                let renderText = decryptedFullString;
+
+                if (decryptedFullString.includes(":::")) {
+                    let parts = decryptedFullString.split(":::");
+                    renderNick = parts[0];
+                    renderText = parts[1];
+                }
+
+                let isSelf = (renderNick === myCurrentNick) ? " self-sent" : "";
+                chatWindow.innerHTML += `
+                    <div class="msg-bubble${isSelf}">
+                        <div class="msg-meta-info">
+                            <span class="msg-author-name">${renderNick}</span>
+                            <span class="msg-timestamp">${msgObj.time}</span>
+                        </div>
+                        <div class="msg-text-payload">${renderText}</div>
+                    </div>
+                `;
+            });
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        });
+    }
+
+    function sendChatMessage() {
+        const inputField = document.getElementById('chat-msg-input');
+        const text = inputField.value.trim();
+        const nickname = document.getElementById('user-nickname').value.trim() || "Lemonadiii";
+        
+        if (!text) return;
+        if (!database) { addLog("[ERROR] Передача невозможна: оффлайн."); return; }
+
+        let currentSalt = parseInt(document.getElementById('cipher-salt').value) || 15;
+        let fullRawString = nickname + ":::" + text;
+        let encryptedPayload = coreTransform(fullRawString, currentSalt, 'enc');
+        
+        const d = new Date();
+        const timeStr = d.toTimeString().split(' ')[0];
+
+        database.ref('messages').push({
+            text: encryptedPayload,
+            time: timeStr
+        }).then(() => { inputField.value = ""; });
+    }
+
+    // АЛГОРИТМ ШИФРОВАНИЯ
+    const ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>/?~` ";
+    let mode = 'enc';
+
+    function setMode(m) {
+        mode = m;
+        document.getElementById('btn-enc').classList.toggle('active', m === 'enc');
+        document.getElementById('btn-dec').classList.toggle('active', m === 'dec');
+    }
+
+    function updateSecurityStatus() {
+        const val = parseInt(document.getElementById('cipher-salt').value) || 0;
+        const badge = document.getElementById('sec-badge');
+        
+        if (val < 50) {
+            badge.innerText = "Status: LOW"; badge.style.color = "#ff4d4d"; badge.style.borderColor = "#ff4d4d"; badge.style.background = "rgba(255,77,77,0.05)";
+        } else if (val < 200) {
+            badge.innerText = "Status: MEDIUM"; badge.style.color = "#ffaa00"; badge.style.borderColor = "#ffaa00"; badge.style.background = "rgba(255,170,0,0.05)";
+        } else if (val < 600) {
+            badge.innerText = "Status: HIGH"; badge.style.color = "#00f2fe"; badge.style.borderColor = "#00f2fe"; badge.style.background = "rgba(0,242,254,0.05)";
+        } else {
+            badge.innerText = "Status: ULTRA"; badge.style.color = "#39ff14"; badge.style.borderColor = "#39ff14"; badge.style.background = "rgba(57,255,20,0.05)";
+        }
+        refreshChatDisplay();
+    }
+
+    function coreTransform(text, salt, operation) {
+        let output = "";
+        for (let i = 0; i < text.length; i++) {
+            let char = text[i];
+            let idx = ALPHABET.indexOf(char);
+            if (idx !== -1) {
+                let dynamicShift = salt + i;
+                if (operation === 'enc') {
+                    let newIdx = (idx + dynamicShift) % ALPHABET.length;
+                    output += ALPHABET[newIdx];
+                } else {
+                    let newIdx = (idx - dynamicShift) % ALPHABET.length;
+                    if (newIdx < 0) newIdx += ALPHABET.length;
+                    output += ALPHABET[newIdx];
+                }
+            } else { output += char; }
+        }
+        return output;
+    }
+
+    function executeCrypto() {
+        const input = document.getElementById('main-input').value;
+        if (!input) return;
+        let salt = parseInt(document.getElementById('cipher-salt').value) || 15;
+        let result = coreTransform(input, salt, mode);
+        
+        document.getElementById('out-block').style.display = 'block';
+        document.getElementById('out-text').innerText = result;
+        addLog("[SUCCESS] Локальный буфер успешно обработан.");
+    }
+
+    function copyOutput() {
+        const txt = document.getElementById('out-text').innerText;
+        navigator.clipboard.writeText(txt).then(() => {
+            const chip = document.querySelector('.btn-copy-floating');
+            chip.innerText = "COPIED!";
+            setTimeout(() => { chip.innerText = "COPY"; }, 1500);
+        });
+    }
+
+    // ИМПОРТ / ЭКСПОРТ .lmndiii
+    function exportEncryptedFile() {
+        let rawInputText = document.getElementById('main-input').value;
+        let currentSalt = parseInt(document.getElementById('cipher-salt').value) || 15;
+        if (!rawInputText) return;
+        let encryptedText = coreTransform(rawInputText, currentSalt, 'enc');
+        let secureContainer = encryptedText + "//SALT:" + currentSalt;
+        const blob = new Blob([secureContainer], { type: 'text/plain' });
+        const link = document.createElement('a');
+        link.download = `packet_${Math.floor(Math.random() * 9000) + 1000}.lmndiii`;
+        link.href = window.URL.createObjectURL(blob);
+        link.click();
+        addLog("[SUCCESS] Контейнер .lmndiii экспортирован.");
+    }
+
+    function triggerImport() { document.getElementById('file-chooser').click(); }
+
+    function importAndDecryptFile(inputElement) {
+        const file = inputElement.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            let fileContent = e.target.result;
+            if (fileContent.includes("//SALT:")) {
+                let parts = fileContent.split("//SALT:");
+                let targetSalt = parseInt(parts[1]) || 15;
+                document.getElementById('cipher-salt').value = targetSalt;
+                updateSecurityStatus();
+                document.getElementById('main-input').value = coreTransform(parts[0], targetSalt, 'dec');
+                document.getElementById('out-block').style.display = 'none';
+                addLog("[SUCCESS] Импортируемый пакет успешно развернут.");
+            }
+            inputElement.value = '';
+        };
+        reader.readAsText(file);
+    }
+
+    // ФОНОВЫЙ ЦИФРОВОЙ ДОЖДЬ
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+    let matrixTimer;
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+
+    const symbols = "0123456789X𝝮∆𝚽ΨΦΞ⚡";
+    const symArr = symbols.split("");
+    const fSize = 13;
+    let cols = canvas.width / fSize;
+    let drops = Array(Math.floor(cols)).fill(1);
+
+    function draw(c1, c2) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = fSize + 'px monospace';
+        for (let i = 0; i < drops.length; i++) {
+            ctx.fillStyle = i % 3 === 0 ? c1 : c2;
+            ctx.fillText(symArr[Math.floor(Math.random() * symArr.length)], i * fSize, drops[i] * fSize);
+            if (drops[i] * fSize > canvas.height && Math.random() > 0.98) drops[i] = 0;
+            drops[i]++;
+        }
+    }
+
+    function runMatrixEffect(theme) {
+        clearInterval(matrixTimer);
+        let c1 = '#00f2fe', c2 = '#3a0ca3';
+        if (theme === 'matrix') { c1 = '#39ff14'; c2 = '#004d00'; }
+        else if (theme === 'sand') { c1 = '#ffaa00'; c2 = '#3a2200'; }
+        else if (theme === 'gotham') { c1 = '#ffffff'; c2 = '#22252a'; }
+        else if (theme === 'alarm') { c1 = '#ff4d4d'; c2 = '#440000'; }
+        matrixTimer = setInterval(() => draw(c1, c2), 35);
+    }
+    runMatrixEffect('cyber');
+
+    function setTheme(node, name) {
+        document.querySelectorAll('.theme-node').forEach(n => n.classList.remove('active'));
+        node.classList.add('active');
+        document.body.className = 'theme-' + name;
+        runMatrixEffect(name);
+        addLog(`[UI] Активирован цветовой профиль: ${name.toUpperCase()}`);
+    }
+
+    function addLog(text) {
+        const box = document.getElementById('log-box');
+        const d = new Date();
+        box.innerHTML += `<div>[${d.toTimeString().split(' ')[0]}] ${text}</div>`;
+        box.scrollTop = box.scrollHeight;
+    }
+
+    updateSecurityStatus();
+</script>
+</body>
+</html>
